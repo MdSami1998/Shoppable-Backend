@@ -1,4 +1,4 @@
-git const express = require('express');
+const express = require('express');
 const cors = require('cors');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config();
@@ -29,7 +29,9 @@ async function run() {
         await client.connect();
         // await client.db("shoppableData").command({ ping: 1 });
         const productsCollection = client.db('shoppableGroceryData').collection('products');
+        const orderCollection = client.db('shoppableGroceryData').collection('orders');
 
+        // get all products API
         app.get('/products', async (req, res) => {
             const query = {};
             const cursor = productsCollection.find(query);
@@ -37,12 +39,20 @@ async function run() {
             res.send(products);
         });
 
-        app.get('/products/:id', async (req, res) => {
+        // get single products API 
+        app.get('/product/:id', async (req, res) => {
             const id = req.params.id;
-            const query = {_id:new ObjectId(id)};
+            const query = { _id: new ObjectId(id) };
             const product = await productsCollection.findOne(query);
             res.send(product);
         });
+
+        // API for ordered product
+        app.post('/order', async (req, res) => {
+            const order = req.body;
+            const result = await orderCollection.insertOne(order);
+            res.send(result);
+        })
 
     } finally {
 
