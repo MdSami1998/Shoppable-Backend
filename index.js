@@ -3,6 +3,8 @@ const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config();
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
 const port = process.env.PORT || 5000;
 
 const app = express();
@@ -47,6 +49,8 @@ async function run() {
         const productsCollection = client.db('shoppableGroceryData').collection('products');
         const orderCollection = client.db('shoppableGroceryData').collection('orders');
         const userCollection = client.db('shoppableGroceryData').collection('users');
+        const reviewsCollection = client.db('shoppableGroceryData').collection('reviews');
+        const paymentCollection = client.db('shoppableGroceryData').collection('payments');
 
         // get all products API
         app.get('/products', async (req, res) => {
@@ -113,6 +117,25 @@ async function run() {
             }
         })
 
+        // api for delete single order from my order
+        app.delete('/order/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) };
+            const result = await orderCollection.deleteOne(query);
+            res.send(result);
+        })
+
+        // API FOR SHIPPED SINGLE ORDER BY ADMIN
+        app.put('/manageorders/:id', async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id) };
+            const updateDoc = {
+                $set: { status: 'shipped' },
+            };
+            const result = await orderCollection.updateOne(filter, updateDoc);
+            res.send(result);
+        })
+
         // GET MEMBER DATA BY QUERY FOR PROFILE UPDATE
         app.get('/member', async (req, res) => {
             const email = req.query.email;
@@ -141,7 +164,7 @@ async function run() {
         })
 
         // make admin API
-        app.put('/user/admin/:email', verifyJWT,  async (req, res) => {
+        app.put('/user/admin/:email', verifyJWT, async (req, res) => {
             const email = req.params.email;
             const requester = req.decoded.email;
             const requesterAccount = await userCollection.findOne({ email: requester });
@@ -164,6 +187,81 @@ async function run() {
             const user = await userCollection.findOne({ email: email });
             const isAdmin = user.role === 'admin';
             res.send({ admin: isAdmin });
+        })
+
+        // Add products in productsCollection api in Dashboard
+        app.post('/products', async (req, res) => {
+            const product = req.body;
+            const result = await productsCollection.insertOne(product);
+            res.send(result);
+        })
+
+        // get all reviews collection api
+        app.get('/reviews', async (req, res) => {
+            const query = {};
+            const result = await reviewsCollection.find(query).toArray();
+            res.send(result.reverse())
+        })
+
+        // api for post reviews from addReview page of Dashboard
+        app.post('/reviews', async (req, res) => {
+            const review = req.body;
+            const result = await reviewsCollection.insertOne(review);
+            res.send(result);
+        })
+
+        // MANAGE ALL ORDERS BY ADMIN API
+        app.get('/manageorders', async (req, res) => {
+            const query = {};
+            const cursor = orderCollection.find(query);
+            const result = await cursor.toArray();
+            res.send(result.reverse())
+        })
+
+        // API FOR DELETE SINGLE ORDER BY ADMIN
+        app.delete('/manageorders/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const result = await orderCollection.deleteOne(query);
+            res.send(result);
+        })
+
+        // get order by id for payment
+        app.get('/order/:id', verifyJWT, async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const result = await orderCollection.findOne(query);
+            res.send(result);
+        })
+
+        // PAYMENT INTET API
+        app.post("/create-payment-intent", verifyJWT, async (req, res) => {
+            // const { price } = req.body;
+            const service = req.body;
+            const price = service.price;
+            const amount = price * 100;
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: amount,
+                currency: "usd",
+                payment_method_types: ['card']
+            });
+            res.send({ clientSecret: paymentIntent.client_secret });
+        })
+
+        // update payment data in order collection 
+        app.patch('/order/:id', verifyJWT, async (req, res) => {
+            const id = req.params.id;
+            const payment = req.body;
+            const filter = { _id: new ObjectId(id) };
+            const updatedDoc = {
+                $set: {
+                    paid: true,
+                    transectionID: payment.transectionID
+                },
+            };
+            const result = await paymentCollection.insertOne(payment);
+            const updatedOrder = await orderCollection.updateOne(filter, updatedDoc);
+            res.send(updatedDoc);
         })
 
     } finally {
