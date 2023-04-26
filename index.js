@@ -51,6 +51,7 @@ async function run() {
         const userCollection = client.db('shoppableGroceryData').collection('users');
         const reviewsCollection = client.db('shoppableGroceryData').collection('reviews');
         const paymentCollection = client.db('shoppableGroceryData').collection('payments');
+        const teamMembersCollection = client.db('shoppableGroceryData').collection('teamMembers');
 
         // get all products API
         app.get('/products', async (req, res) => {
@@ -263,6 +264,15 @@ async function run() {
             const updatedOrder = await orderCollection.updateOne(filter, updatedDoc);
             res.send(updatedDoc);
         })
+
+        // team members api collection 
+        app.get('/team-members', async (req, res) => {
+            const query = {};
+            const cursor = teamMembersCollection.find(query);
+            const members = await cursor.toArray();
+            res.send(members);
+        })
+
 
     } finally {
 
