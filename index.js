@@ -69,6 +69,14 @@ async function run() {
             res.send(product);
         });
 
+        // api for delete product from manage products in dashboard by admin
+        app.delete('/products/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const result = await productsCollection.deleteOne(query);
+            res.send(result);
+        })
+
         // API for ordered product
         app.post('/order', async (req, res) => {
             const order = req.body;
@@ -272,7 +280,6 @@ async function run() {
             const members = await cursor.toArray();
             res.send(members);
         })
-
 
     } finally {
 
